@@ -13,6 +13,7 @@ use std::{borrow::Borrow, collections::HashMap, future::Future, io};
 use cfg_if::cfg_if;
 use tracing::{debug, error, info, trace, warn};
 use trust_dns_proto::rr::Record;
+use trust_dns_resolver::error::ResolveErrorKind;
 
 #[cfg(feature = "dnssec")]
 use crate::client::rr::{
@@ -30,6 +31,7 @@ use crate::{
     },
     server::{Request, RequestHandler, RequestInfo, ResponseHandler, ResponseInfo},
 };
+use crate::authority::authority_object::SingleRecordLookup;
 
 /// Set of authorities, zones, available to this server.
 #[derive(Default)]
@@ -638,8 +640,22 @@ async fn send_forwarded_response(
     } else {
         match future.await {
             Err(e) => {
-                if e.is_nx_domain() {
-                    response_header.set_response_code(ResponseCode::NXDomain);
+                match &e {
+                    LookupError::ResponseCode(ResponseCode::NXDomain) => {
+                        response_header.set_response_code(ResponseCode::NXDomain);
+                    },
+                    LookupError::ResolveError(resolve_error) => match resolve_error.kind() {
+                        ResolveErrorKind::NoRecordsFound {response_code: ResponseCode::NXDomain, trusted: true, soa: Some(soa), ..} => {
+                            return LookupSections {
+                                answers: Box::new(EmptyLookup),
+                                ns: Box::<AuthLookup>::default(),
+                                soa: Box::new(SingleRecordLookup::new(soa.as_ref())),
+                                additionals: Box::<AuthLookup>::default()
+                            }
+                        },
+                        _ => {}
+                    }
+                    _ => {}
                 }
                 debug!("error resolving: {}", e);
                 Box::new(EmptyLookup)

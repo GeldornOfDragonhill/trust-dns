@@ -240,3 +240,30 @@ impl LookupObject for EmptyLookup {
         None
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct SingleRecordLookup {
+    record: Record
+}
+
+impl SingleRecordLookup {
+    pub(crate) fn new(record: &Record) -> Self {
+        Self {
+            record: record.clone()
+        }
+    }
+}
+
+impl LookupObject for SingleRecordLookup {
+    fn is_empty(&self) -> bool {
+        false
+    }
+
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item=&'a Record> + Send + 'a> {
+        Box::new(std::iter::once(&self.record))
+    }
+
+    fn take_additionals(&mut self) -> Option<Box<dyn LookupObject>> {
+        None
+    }
+}
