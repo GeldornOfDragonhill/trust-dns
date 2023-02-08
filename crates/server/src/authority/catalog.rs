@@ -646,6 +646,7 @@ async fn send_forwarded_response(
                     },
                     LookupError::ResolveError(resolve_error) => match resolve_error.kind() {
                         ResolveErrorKind::NoRecordsFound {response_code: ResponseCode::NXDomain, trusted: true, soa: Some(soa), ..} => {
+                            response_header.set_response_code(ResponseCode::NXDomain);
                             return LookupSections {
                                 answers: Box::new(EmptyLookup),
                                 ns: Box::<AuthLookup>::default(),
